@@ -1,0 +1,2 @@
+set(__QT_DEPLOY_TARGET_robot_visualizer_FILE /home/tomass/projects/Robotics/viz/robot_visualizer)
+set(__QT_DEPLOY_TARGET_robot_visualizer_TYPE EXECUTABLE)
