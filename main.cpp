@@ -70,7 +70,7 @@ public:
 
     resetTransform();
 
-    // resize to fit whole image
+    // resize to fit whole image (?)
     fitInView(200, 200, 1000, 1000, Qt::AspectRatioMode::KeepAspectRatio);
   }
 
@@ -153,8 +153,7 @@ public:
                 QWidget *parent = nullptr)
       : QFrame(parent), id(id), priority(priority) {
 
-    setFrameShape(QFrame::StyledPanel);
-    setFrameShadow(QFrame::Plain);
+    setFrameStyle(QFrame::NoFrame);
 
     // contains title then info
     auto *lay = new QVBoxLayout(this);
@@ -170,7 +169,8 @@ public:
     // TODO: expand across the entire title so its a lot easier to access
     expand_collapse_btn->setFixedWidth(20);
 
-    connect(expand_collapse_btn, &QPushButton::clicked, this, &ComponentCard::expand_collapse);
+    connect(expand_collapse_btn, &QPushButton::clicked, this,
+            &ComponentCard::expand_collapse);
 
     h->addWidget(title_label);
     h->addStretch();
@@ -178,16 +178,22 @@ public:
 
     lay->addLayout(h);
 
-    info = new QLabel(QString("info... %1").arg(priority));
-    info->setWordWrap(true);
+    infoWidget = new QLabel(QString("info... %1").arg(priority));
+    // infoWidget->setWordWrap(true);
 
-    lay->addWidget(info);
+    lay->addWidget(infoWidget);
   }
 
   QString getId() const { return id; }
   int getPriority() const { return priority; }
   void setPriority(int p) { priority = p; }
-  void setInfoText(const QString &s) { info->setText(s); }
+
+  void setInfoWidget(QWidget *new_info_widget) {
+    delete infoWidget;
+    infoWidget = new_info_widget;
+  }
+
+  QWidget *getInfoWidget() const { return infoWidget; }
 
 signals:
   void removeRequested(const QString &id);
@@ -195,12 +201,12 @@ signals:
 private slots:
   void requestRemove() { emit removeRequested(id); }
   void expand_collapse() {
-    if (info->isVisible()) {
-      info->setVisible(false);
+    if (infoWidget->isVisible()) {
+      infoWidget->setVisible(false);
       expand_collapse_btn->setArrowType(Qt::ArrowType::DownArrow);
       // remove_btn->setText(QString("Expand"));
     } else {
-      info->setVisible(true);
+      infoWidget->setVisible(true);
       expand_collapse_btn->setArrowType(Qt::ArrowType::UpArrow);
       // remove_btn->setText(QString("Collapse"));
     }
@@ -210,24 +216,26 @@ private:
   QToolButton *expand_collapse_btn;
   QString id;
   int priority;
-  QLabel *info;
+  QWidget *infoWidget;
 };
 
-// ----------------------
-// Sidebar manager
-// ----------------------
 class Sidebar : public QWidget {
   Q_OBJECT
 public:
   Sidebar(QWidget *parent = nullptr) : QWidget(parent) {
     auto *lay = new QVBoxLayout(this);
     setMinimumWidth(260);
+
     scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
+    scroll->setFrameStyle(QFrame::NoFrame);
+
     container = new QWidget;
     vlay = new QVBoxLayout(container);
     vlay->addStretch();
+
     scroll->setWidget(container);
+
     lay->addWidget(scroll);
     QPushButton *add = new QPushButton("Add random component");
     connect(add, &QPushButton::clicked, this, &Sidebar::addRandomComponent);
@@ -236,8 +244,6 @@ public:
 
   void addComponent(const QString &id, const QString &title, int priority) {
     ComponentCard *card = new ComponentCard(id, title, priority);
-    connect(card, &ComponentCard::removeRequested, this,
-            &Sidebar::removeComponentById);
     cards.push_back(card);
     refreshOrder();
   }
@@ -308,8 +314,8 @@ public:
     // separates field from timeline
     QSplitter *fieldSplit = new QSplitter(Qt::Vertical);
 
-    mainSplit->setHandleWidth(10);
-    fieldSplit->setHandleWidth(10);
+    mainSplit->setHandleWidth(20);
+    fieldSplit->setHandleWidth(20);
 
     fieldView = new FieldView;
     fieldSplit->addWidget(fieldView);
@@ -388,25 +394,28 @@ private:
   FieldWindow *fieldWindow;
 };
 
-void add_path(){
-    // TODO: impl
-    // add to field
-    // add info to sidebar
-    // add to some list that keeps tracks of all elements
+void add_path() {
+  // TODO: impl
+  // add to field
+  // add info to sidebar
+  // add to some list that keeps tracks of all elements
 }
 
-void add_point_cloud(){
-    // TODO: impl
-    // add to field
-    // add info to sidebar
-    // add to some list that keeps tracks of all elements
+void add_point_cloud() {
+  // TODO: impl
+  // add to field
+  // add info to sidebar
+  // add to some list that keeps tracks of all elements
 }
 
-void load_file(){
-    // TODO: impl
-    // load field image?
-    // load paths / point clouds
+void load_file() {
+  // TODO: impl
+  // load field image?
+  // load paths / point clouds
 }
+
+// TODO:
+// add keybinds (left/right arrows, space, more?)
 
 int main(int argc, char **argv) {
   QApplication app(argc, argv);
