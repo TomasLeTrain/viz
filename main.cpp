@@ -1,3 +1,12 @@
+#include <qcolor.h>
+#include <qdebug.h>
+#include <qevent.h>
+#include <qlogging.h>
+#include <qobject.h>
+#define M_TWOPI (2 * M_PI)
+
+#include "units/Vector2D.hpp"
+#include "units/units.hpp"
 #include <QApplication>
 #include <QFileDialog>
 #include <QFrame>
@@ -30,9 +39,14 @@
 #include <algorithm>
 #include <iostream>
 #include <qgesture.h>
+#include <qgraphicsitem.h>
 #include <qmainwindow.h>
 #include <qnamespace.h>
+#include <qpoint.h>
+#include <qtypes.h>
+#include <qwidget.h>
 
+using Point = units::V2FPosition;
 class FieldView : public QGraphicsView {
   Q_OBJECT
 public:
@@ -42,7 +56,10 @@ public:
 
     setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 
-    setDragMode(QGraphicsView::ScrollHandDrag);
+    // setDragMode(QGraphicsView::ScrollHandDrag);
+    setDragMode(QGraphicsView::RubberBandDrag);
+    setAttribute(Qt::WA_AcceptTouchEvents);
+
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 
     scene = new QGraphicsScene(this);
@@ -60,13 +77,16 @@ public:
     // behind everything
     bgItem->setZValue(-100);
     auto original_bounds = bgItem->boundingRect();
+    image_width = original_bounds.width();
+    image_height = original_bounds.width();
 
     // leaves about 500 pixels of padding
-    scene->setSceneRect(-500, -500, original_bounds.width() + 1000,
-                        original_bounds.height() + 1000);
+    scene->setSceneRect(-500, -500, image_width + 1000, image_height + 1000);
 
     // makes it actually smooth
     bgItem->setTransformationMode(Qt::SmoothTransformation);
+
+    // bgItem->setAcceptTouchEvents(true);
 
     resetTransform();
 
@@ -74,16 +94,34 @@ public:
     fitInView(200, 200, 1000, 1000, Qt::AspectRatioMode::KeepAspectRatio);
   }
 
+  qreal LengthToQreal(Length value) {
+    return value * (image_width / total_field_length);
+  }
+  Length QrealToLength(qreal value) {
+    return value * (total_field_length / image_width);
+  }
+
+  QPointF PointToQPoint(Point point) {
+    return {(point.x / total_field_length + 0.5) * image_width,
+            (point.y / total_field_length + 0.5) * image_height};
+  }
+
+  Point QPointToPoint(QPointF point) {
+    return {(point.x() / image_width - 0.5) * total_field_length,
+            (point.y() / image_height - 0.5) * total_field_length};
+  }
+
   // Add a point (x,y in field coordinates)
-  QGraphicsEllipseItem *addPoint(qreal x, qreal y, qreal radius = 6,
-                                 const QColor &c = Qt::red) {
+  QGraphicsEllipseItem *drawPoint(Point point, Length radius = 2_in,
+                                  const QColor &c = Qt::red) {
+    QPointF q_point = PointToQPoint(point);
+    qreal qradius = LengthToQreal(radius);
     QGraphicsEllipseItem *it =
-        scene->addEllipse(x - radius / 2, y - radius / 2, radius, radius,
-                          QPen(Qt::NoPen), QBrush(c));
-    it->setFlag(QGraphicsItem::ItemIgnoresTransformations,
-                false); // scale with view
+        scene->addEllipse(q_point.x() - qradius / 2, q_point.y() - qradius / 2,
+                          qradius, qradius, QPen(Qt::NoPen), QBrush(c));
+    // scale with view
+    it->setFlag(QGraphicsItem::ItemIgnoresTransformations, false);
     it->setZValue(10);
-    points.push_back(it);
     return it;
   }
 
@@ -97,25 +135,34 @@ public:
     }
     QGraphicsPathItem *it = scene->addPath(p, QPen(c, width));
     it->setZValue(5);
-    paths.push_back(it);
     return it;
   }
-
-  void clearField() {
-    for (auto *it : points) {
-      scene->removeItem(it);
-      delete it;
-    }
-    points.clear();
-    for (auto *it : paths) {
-      scene->removeItem(it);
-      delete it;
-    }
-    paths.clear();
-  }
+  void removeItem(QGraphicsItem *item) { scene->removeItem(item); }
 
 protected:
+  bool event(QEvent *event) override {
+    // std::cout << "called!! ";
+    qDebug() << event->type() << "\n";
+    if (event->type() == QEvent::TouchBegin) {
+      std::cout << "began touch!!" << std::endl;
+      return true;
+    } else if (event->type() == QEvent::TouchUpdate) {
+      auto curr = static_cast<QTouchEvent *>(event);
+      std::cout << "updating touch!!" << std::endl;
+      std::cout << curr->point(0).position().x() << std::endl;
+      return true;
+    } else if (event->type() == QEvent::NativeGesture) {
+    }
+    return false;
+  }
   void wheelEvent(QWheelEvent *event) override {
+    std::cout << (event->deviceType() == QInputDevice::DeviceType::TouchPad
+                      ? "touhcpad"
+                      : "who knows")
+              << std::endl;
+    std::cout << event->angleDelta().x() << " " << event->angleDelta().y()
+              << std::endl;
+
     // quadratic scaling makes big changes zoom quicker
     const qreal power = pow(event->angleDelta().y() / 1000.0, 2);
 
@@ -141,17 +188,19 @@ protected:
 private:
   QGraphicsScene *scene{nullptr};
   QGraphicsPixmapItem *bgItem{nullptr};
-  QVector<QGraphicsEllipseItem *> points;
-  QVector<QGraphicsPathItem *> paths;
-};
 
+  float image_width = 2000;
+  float image_height = 2000;
+
+  const Length total_field_length = 144_in;
+};
 // card in sidebar
 class ComponentCard : public QFrame {
   Q_OBJECT
 public:
-  ComponentCard(QString id, QString title, int priority,
+  ComponentCard(QString title, int priority, QWidget *infoWidget,
                 QWidget *parent = nullptr)
-      : QFrame(parent), id(id), priority(priority) {
+      : QFrame(parent), priority(priority), infoWidget(infoWidget) {
 
     setFrameStyle(QFrame::NoFrame);
 
@@ -178,13 +227,9 @@ public:
 
     lay->addLayout(h);
 
-    infoWidget = new QLabel(QString("info... %1").arg(priority));
-    // infoWidget->setWordWrap(true);
-
     lay->addWidget(infoWidget);
   }
 
-  QString getId() const { return id; }
   int getPriority() const { return priority; }
   void setPriority(int p) { priority = p; }
 
@@ -195,13 +240,13 @@ public:
 
   QWidget *getInfoWidget() const { return infoWidget; }
 
-signals:
-  void removeRequested(const QString &id);
+  void setId(int id) { this->id = id; }
+  int getId() { return this->id; }
 
 private slots:
-  void requestRemove() { emit removeRequested(id); }
   void expand_collapse() {
-    if (infoWidget->isVisible()) {
+    bool is_visible = infoWidget->isVisible();
+    if (is_visible) {
       infoWidget->setVisible(false);
       expand_collapse_btn->setArrowType(Qt::ArrowType::DownArrow);
       // remove_btn->setText(QString("Expand"));
@@ -214,9 +259,9 @@ private slots:
 
 private:
   QToolButton *expand_collapse_btn;
-  QString id;
   int priority;
   QWidget *infoWidget;
+  int id;
 };
 
 class Sidebar : public QWidget {
@@ -242,21 +287,31 @@ public:
     lay->addWidget(add);
   }
 
-  void addComponent(const QString &id, const QString &title, int priority) {
-    ComponentCard *card = new ComponentCard(id, title, priority);
+  // returns id associated with the component
+  int addComponent(ComponentCard *card) {
+    curr_id++;
+    card->setId(curr_id);
+
     cards.push_back(card);
     refreshOrder();
+
+    return curr_id;
   }
 
 public slots:
-  void addRandomComponent() {
+  int addRandomComponent() {
     static int n = 1;
     QString id = QString("comp_%1").arg(n++);
     int p = rand() % 100;
-    addComponent(id, QString("Component %1").arg(id), p);
+
+    QLabel *infoWidget = new QLabel(QString("info... %1").arg(p));
+    infoWidget->setWordWrap(true);
+
+    return addComponent(
+        new ComponentCard(QString("Component %1").arg(id), p, infoWidget));
   }
 
-  void removeComponentById(const QString &id) {
+  void removeComponentById(int id) {
     auto it = std::find_if(cards.begin(), cards.end(),
                            [&](ComponentCard *c) { return c->getId() == id; });
     if (it != cards.end()) {
@@ -295,11 +350,116 @@ private:
   QWidget *container;
   QVBoxLayout *vlay;
   QVector<ComponentCard *> cards;
+  // number of components that have been added so far
+  // used to identify individual components
+  int curr_id = 0;
 };
 
-// ----------------------
-// Main window tying everything together
-// ----------------------
+class Element {
+public:
+  virtual void draw(FieldView *fieldView) = 0;
+  virtual void clear(FieldView *fieldView) = 0;
+
+  virtual Point getClosestPoint(Point target) = 0;
+  virtual ~Element() = default;
+};
+
+class PointElement : public Element {
+public:
+  PointElement(Point point, Length radius = 2_in, const QColor &color = Qt::red)
+      : point(point), radius(radius), color(color) {}
+
+  void draw(FieldView *fieldView) override {
+    fieldView->drawPoint(point, radius, color);
+  }
+  void clear(FieldView *fieldView) override {
+    fieldView->removeItem(it);
+    delete it;
+    it = nullptr;
+  }
+  Point getClosestPoint(Point target) override { return point; }
+
+private:
+  Point point;
+  Length radius = 2_in;
+  QColor color = Qt::red;
+  QGraphicsEllipseItem *it;
+};
+
+// TODO: how to handle when deleting elements?
+class ElementManager {
+public:
+  ElementManager() {}
+
+  Point getclosestPoint(Point target) {
+    Point result = units::origin<Length>;
+    Length current_best = 10000_in;
+
+    for (auto element : elements) {
+      const Point current_point = element->getClosestPoint(target);
+      if (const Length curr_dist = current_point.distanceTo(target);
+          curr_dist < current_best) {
+        result = current_point;
+        current_best = curr_dist;
+      }
+    }
+
+    return result;
+  }
+
+  void addElement(Element *element) { elements.push_back(element); }
+
+  void drawElements(FieldView *fieldView) {
+    for (auto element : elements) {
+      element->draw(fieldView);
+    }
+  }
+
+  void clearElements(FieldView *fieldView) {
+    for (auto element : elements) {
+      element->clear(fieldView);
+    }
+  }
+
+private:
+  std::vector<Element *> elements;
+};
+
+class PathComponentInfo : public QWidget {
+  Q_OBJECT
+public:
+  PathComponentInfo(QWidget *parent = nullptr) : QWidget(parent) {
+    auto *lay = new QHBoxLayout(this);
+
+    QLabel *velocityLabel = new QLabel("Velocity: ");
+    slider = new QSlider(Qt::Horizontal);
+    velocityNumberLabel = new QLabel("0");
+
+    connect(slider, &QSlider::valueChanged, this,
+            &PathComponentInfo::onSliderChanged);
+
+    lay->addWidget(velocityLabel);
+    lay->addWidget(slider);
+    lay->addWidget(velocityNumberLabel);
+  }
+private slots:
+  void onSliderChanged(int value) {
+    double pct = value / 1000.0;
+
+    float maxVel = 80;
+    float curr_vel = maxVel * pct;
+
+    velocityNumberLabel->setText(QString("%1").arg(curr_vel));
+    emit velocityChanged(curr_vel);
+  }
+signals:
+  void velocityChanged(float pct);
+
+private:
+  QSlider *slider;
+  QLabel *velocityNumberLabel;
+};
+
 class FieldWindow : public QWidget {
   Q_OBJECT
 
@@ -348,8 +508,19 @@ public:
     image.load("assets/V5RC-PushBack-H2H.png");
 
     fieldView->setBackgroundImage(image);
-    fieldView->addPoint(0, 0, 10);
-    fieldView->addPoint(2000, 2000, 10);
+
+    element_manager.addElement(new PointElement({0_in, 0_in}));
+    element_manager.addElement(new PointElement({24_in, 24_in}));
+    element_manager.drawElements(fieldView);
+
+    auto info = new PathComponentInfo;
+    QObject::connect(info, &PathComponentInfo::velocityChanged,
+                     [&](float new_vel) {
+                       // handle the change in velocity
+                       std::cout << "changed to" << new_vel << std::endl;
+                     });
+    ComponentCard *card = new ComponentCard("howdy", 2, info);
+    sidebar->addComponent(card);
   }
 
 private slots:
@@ -362,11 +533,18 @@ private slots:
     int m = secs / 60;
     int s = secs % 60;
 
+    int total_secs = totalSeconds;
+    int total_m = total_secs / 60;
+    int total_s = total_secs % 60;
+
     timeLabel->setText(QString("%1:%2").arg(m).arg(s, 2, 10, QChar('0')));
+    timeEndLabel->setText(
+        QString("%1:%2").arg(total_m).arg(total_s, 2, 10, QChar('0')));
   }
 
 private:
   FieldView *fieldView;
+  ElementManager element_manager;
 
   QLabel *timeLabel;
   QSlider *slider;
@@ -394,7 +572,34 @@ private:
   FieldWindow *fieldWindow;
 };
 
-void add_path() {
+// class PathManager {
+//   PathManager(int path) : path(path) {}
+//   ComponentCard *makeComponentCard() {}
+//   // void setComponentId(int id) { component_id = id; }
+//
+//   void show(Sidebar *sidebar_instance, FieldView *field_instance) {
+//     // should add the component to sidebar
+//     // should show on field
+//     component_id = sidebar_instance->addComponent(makeComponentCard());
+//
+//     QVector<QPointF> pts = {QPointF{2, 2}, QPointF{4, 4}};
+//     QGraphicsPathItem *path_field_item = field_instance->addPath(pts);
+//   }
+//
+//   void wantToRemove() {
+//     // signal?
+//   }
+//
+//   void wantToAdd() {
+//     // signal?
+//   }
+//
+// private:
+//   int path;
+//   int component_id;
+// };
+
+void add_path(int path) {
   // TODO: impl
   // add to field
   // add info to sidebar

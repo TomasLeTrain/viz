@@ -1,9 +1,17 @@
 CompileFlags:
   # Treat code as C++, use C++17 standard, enable more warnings.
-  # Add: [-xc++, -std=c++17, -Wall, -Wno-missing-prototypes]
+  Add: [
+    -xc++,
+    -std=c++23,
+    -Wall,
+    -Wno-missing-prototypes,
+    #????????????/
+    -isystem/nix/store/68ndh04pl2hhhizsarvzwa9cnlp7zj3d-gcc-14.3.0/include/c++/14.3.0,
+    -isystem/nix/store/68ndh04pl2hhhizsarvzwa9cnlp7zj3d-gcc-14.3.0/include/c++/14.3.0/x86_64-unknown-linux-gnu 
+  ]
   # Remove extra warnings specified in compile commands.
   # Single value is also acceptable, same as "Remove: [-mabi]"
-  Remove: -mno-direct-extern-access
+  Remove: -mno-direct-extern-access -std=gnu23
 #
 # Diagnostics:
   # Tweak Clang-Tidy checks.
