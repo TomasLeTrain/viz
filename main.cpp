@@ -1,3 +1,4 @@
+#include <qabstractscrollarea.h>
 #include <qcolor.h>
 #include <qdebug.h>
 #include <qevent.h>
@@ -28,6 +29,7 @@
 #include <QPainterPath>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSlider>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -58,7 +60,6 @@ public:
 
     // setDragMode(QGraphicsView::ScrollHandDrag);
     setDragMode(QGraphicsView::RubberBandDrag);
-    setAttribute(Qt::WA_AcceptTouchEvents);
 
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 
@@ -85,8 +86,6 @@ public:
 
     // makes it actually smooth
     bgItem->setTransformationMode(Qt::SmoothTransformation);
-
-    // bgItem->setAcceptTouchEvents(true);
 
     resetTransform();
 
@@ -141,48 +140,56 @@ public:
 
 protected:
   bool event(QEvent *event) override {
-    // std::cout << "called!! ";
-    qDebug() << event->type() << "\n";
-    if (event->type() == QEvent::TouchBegin) {
-      std::cout << "began touch!!" << std::endl;
-      return true;
-    } else if (event->type() == QEvent::TouchUpdate) {
-      auto curr = static_cast<QTouchEvent *>(event);
-      std::cout << "updating touch!!" << std::endl;
-      std::cout << curr->point(0).position().x() << std::endl;
-      return true;
-    } else if (event->type() == QEvent::NativeGesture) {
+    if (event->type() == QEvent::NativeGesture) {
+      return nativeGestureEvent(static_cast<QNativeGestureEvent *>(event));
     }
-    return false;
+
+    return QWidget::event(event);
   }
-  void wheelEvent(QWheelEvent *event) override {
-    std::cout << (event->deviceType() == QInputDevice::DeviceType::TouchPad
-                      ? "touhcpad"
-                      : "who knows")
-              << std::endl;
-    std::cout << event->angleDelta().x() << " " << event->angleDelta().y()
-              << std::endl;
 
-    // quadratic scaling makes big changes zoom quicker
-    const qreal power = pow(event->angleDelta().y() / 1000.0, 2);
+  // allows pinch on touchpads
+  bool nativeGestureEvent(QNativeGestureEvent *event) {
+    if (event->gestureType() == Qt::NativeGestureType::ZoomNativeGesture) {
+      const qreal power = event->value();
 
-    const double scalingFactor = 1 + power;
+      const double scalingFactor = 1 + power;
 
-    // used to cap zoom in/out
-    qreal curr_scale = transform().m11();
+      // used to cap zoom in/out
+      qreal curr_scale = transform().m11();
 
-    qreal max_zoom_in = 2.0;
-    qreal max_zoom_out = 3.0;
+      qreal max_zoom_in = 2.0;
+      qreal max_zoom_out = 3.0;
 
-    if (event->angleDelta().y() > 0) {
-      if (curr_scale <= max_zoom_in) {
+      // zoom in
+      if (scalingFactor > 1 && curr_scale <= max_zoom_in) {
+        scale(scalingFactor, scalingFactor);
+        // zoom out
+      } else if (scalingFactor < 1 && curr_scale >= 1.0 / max_zoom_out) {
         scale(scalingFactor, scalingFactor);
       }
-    } else {
-      if (curr_scale >= 1.0 / max_zoom_out) {
-        scale(1.0 / scalingFactor, 1.0 / scalingFactor);
-      }
     }
+
+    if (event->gestureType() == Qt::NativeGestureType::PanNativeGesture) {
+      auto hor = horizontalScrollBar();
+      auto ver = verticalScrollBar();
+
+      const qreal sensitivity = 0.5;
+
+      hor->setValue(hor->value() - event->delta().x() * sensitivity);
+      ver->setValue(ver->value() - event->delta().y() * sensitivity);
+    }
+
+    return true;
+  }
+
+  void wheelEvent(QWheelEvent *event) override {
+    auto hor = horizontalScrollBar();
+    auto ver = verticalScrollBar();
+
+    const qreal sensitivity = 0.1;
+
+    hor->setValue(hor->value() - event->angleDelta().x() * sensitivity);
+    ver->setValue(ver->value() - event->angleDelta().y() * sensitivity);
   }
 
 private:
@@ -194,6 +201,7 @@ private:
 
   const Length total_field_length = 144_in;
 };
+
 // card in sidebar
 class ComponentCard : public QFrame {
   Q_OBJECT
