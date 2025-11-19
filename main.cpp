@@ -84,7 +84,7 @@ public:
     // leaves about 500 pixels of padding
     scene->setSceneRect(-500, -500, image_width + 1000, image_height + 1000);
 
-    // makes it actually smooth
+    // makes image actually smooth
     bgItem->setTransformationMode(Qt::SmoothTransformation);
 
     resetTransform();
@@ -144,7 +144,7 @@ protected:
       return nativeGestureEvent(static_cast<QNativeGestureEvent *>(event));
     }
 
-    return QWidget::event(event);
+    return QGraphicsView::event(event);
   }
 
   // allows pinch on touchpads
@@ -169,6 +169,7 @@ protected:
       }
     }
 
+    // allows panning while pinching (zooming)
     if (event->gestureType() == Qt::NativeGestureType::PanNativeGesture) {
       auto hor = horizontalScrollBar();
       auto ver = verticalScrollBar();
