@@ -11,10 +11,11 @@
       nativeBuildInputs = [
         pkgs.pkg-config
         pkgs.cmake
+        pkgs.clang-tools
       ];
       buildInputs = with pkgs; [
         qt6.qtbase
-					libcxx
+        libcxx
         # qtcreator
 
         # this is for the shellhook portion
@@ -22,9 +23,9 @@
         makeWrapper
         bashInteractive
 
-        clang_19
+        # llvmPackages.clang-tools
+        # clang
         # clang-tools_19
-			llvmPackages_19.clang-tools
         gcc
         bear
       ];
