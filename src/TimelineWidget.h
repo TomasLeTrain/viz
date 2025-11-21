@@ -1,3 +1,5 @@
+#pragma once
+
 #include <QLabel>
 #include <QSlider>
 #include <QWidget>
