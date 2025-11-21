@@ -4,6 +4,7 @@ qt_add_executable(robot_visualizer
   Point.cpp
   DraggableEllipseItem.cpp
   ComponentCard.cpp
+  Bezier.cpp
 
   main.cpp
 )

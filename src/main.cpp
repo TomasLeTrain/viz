@@ -1,5 +1,7 @@
+#include "geometry/Bezier.h"
 #include "utils.h"
 
+#include "Bezier.h"
 #include "ComponentCard.h"
 #include "DraggableEllipseItem.h"
 #include "Element.h"
@@ -70,6 +72,28 @@ public:
 
     PointInfoWidget *info = new PointInfoWidget(model, properties.movable);
     ComponentCard *card = new ComponentCard("Point", info, 10);
+
+    m_models.append(model);
+    m_views.append(view);
+    m_cards.append(card);
+
+    // assumes sidebar has a layout
+    if (m_sidebar->layout()) {
+      m_sidebar->layout()->addWidget(card);
+    }
+    refreshSidebar();
+
+    return model;
+  }
+
+  BezierModel *addBezier(geometry::CubicBezier *bezier,
+                         BezierElementProperties properties) {
+    BezierModel *model = new BezierModel(bezier);
+
+    BezierView *view = new BezierView(model, m_fieldView, properties);
+
+    BezierInfoWidget *info = new BezierInfoWidget(model, properties.movable);
+    ComponentCard *card = new ComponentCard("Bezier", info, 5);
 
     m_models.append(model);
     m_views.append(view);
@@ -193,6 +217,11 @@ public:
     elementManager->addPoint(Point(24_in, 24_in), {.movable = true});
     elementManager->addPoint(Point(-24_in, -24_in),
                              {.color = Qt::green, .movable = false});
+
+    auto test_bezier = new geometry::CubicBezier({0_in, 0_in}, {10_in, 0_in},
+                                                 {0_in, 10_in}, {24_in, 24_in});
+
+    elementManager->addBezier(test_bezier, {});
 
     connect(add, &QPushButton::clicked, this,
             [this] { elementManager->addPoint(Point(0_in, 0_in), {}); });
