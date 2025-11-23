@@ -5,6 +5,7 @@ qt_add_executable(robot_visualizer
   DraggableEllipseItem.cpp
   ComponentCard.cpp
   Bezier.cpp
+  Robot.cpp
 
   main.cpp
 )

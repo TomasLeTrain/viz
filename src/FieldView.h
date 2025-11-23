@@ -20,6 +20,7 @@ public:
   Length QrealToLength(qreal value);
   QPointF fieldToScene(Point point);
   Point sceneToField(QPointF point);
+
   QGraphicsScene *getScene() const;
 
 protected:

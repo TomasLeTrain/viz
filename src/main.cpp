@@ -8,6 +8,7 @@
 #include "FieldView.h"
 #include "Point.h"
 #include "TimelineWidget.h"
+#include "Robot.h"
 
 #include <qabstractscrollarea.h>
 #include <qbrush.h>
@@ -94,6 +95,28 @@ public:
 
     BezierInfoWidget *info = new BezierInfoWidget(model, properties.movable);
     ComponentCard *card = new ComponentCard("Bezier", info, 5);
+
+    m_models.append(model);
+    m_views.append(view);
+    m_cards.append(card);
+
+    // assumes sidebar has a layout
+    if (m_sidebar->layout()) {
+      m_sidebar->layout()->addWidget(card);
+    }
+    refreshSidebar();
+
+    return model;
+  }
+
+  RobotModel *addRobot(Pose pose,
+                         RobotElementProperties properties) {
+    RobotModel *model = new RobotModel(pose);
+
+    RobotView *view = new RobotView(model, m_fieldView, properties);
+
+    RobotInfoWidget *info = new RobotInfoWidget(model,properties.movable);
+    ComponentCard *card = new ComponentCard("Robot", info, 1);
 
     m_models.append(model);
     m_views.append(view);
@@ -222,6 +245,7 @@ public:
                                                  {0_in, 10_in}, {24_in, 24_in});
 
     elementManager->addBezier(test_bezier, {});
+    elementManager->addRobot({48_in,48_in,0_stDeg}, {});
 
     connect(add, &QPushButton::clicked, this,
             [this] { elementManager->addPoint(Point(0_in, 0_in), {}); });

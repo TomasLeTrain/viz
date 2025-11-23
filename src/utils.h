@@ -4,5 +4,7 @@
 
 #include "units/Vector2D.hpp"
 #include "units/units.hpp"
+#include "units/Pose.hpp"
 
 using Point = units::V2Position;
+using Pose = units::Pose;
