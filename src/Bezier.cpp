@@ -3,6 +3,7 @@
 #include "moc_Bezier.cpp"
 #include <algorithm>
 #include <qgraphicsitem.h>
+#include <qline.h>
 #include <qnamespace.h>
 
 BezierModel::BezierModel(geometry::CubicBezier *bezier) : m_bezier(bezier) {}
@@ -36,6 +37,14 @@ BezierView::BezierView(BezierModel *model, FieldView *fieldView,
                     m_fieldView->LengthToQreal(m_properties.strokeWidth)));
   item->setZValue(5);
   m_fieldView->getScene()->addItem(item);
+
+  auto first_line = QLineF(newEndpoints.at(0), newEndpoints.at(1));
+  auto second_line = QLineF(newEndpoints.at(2), newEndpoints.at(3));
+
+  control_line_items[0] = m_fieldView->getScene()->addLine(
+      first_line, QPen(Qt::red, 2, Qt::DashLine));
+  control_line_items[1] = m_fieldView->getScene()->addLine(
+      second_line, QPen(Qt::red, 2, Qt::DashLine));
 
   connect(m_model, &BezierModel::endpointsChanged, this,
           &BezierView::onModelChanged);
@@ -82,6 +91,15 @@ QPainterPath BezierView::createPath(std::array<Point, 4> endpoints) {
   return path;
 }
 
+void BezierView::drawControlLines(std::array<Point, 4> endpoints) {
+  auto newEndpoints = endpointsToScene(endpoints);
+  auto first_line = QLineF(newEndpoints.at(0), newEndpoints.at(1));
+  auto second_line = QLineF(newEndpoints.at(2), newEndpoints.at(3));
+
+  control_line_items[0]->setLine(first_line);
+  control_line_items[1]->setLine(second_line);
+}
+
 BezierView::~BezierView() {
   if (item) {
     m_fieldView->getScene()->removeItem(item);
@@ -100,6 +118,7 @@ BezierView::~BezierView() {
 QGraphicsPathItem *BezierView::graphicsItem() const { return item; }
 
 void BezierView::onModelChanged(const std::array<Point, 4> &endpoints) {
+  drawControlLines(endpoints);
   item->setPath(createPath(endpoints));
 }
 

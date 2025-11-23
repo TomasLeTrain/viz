@@ -12,6 +12,7 @@
 #include <QLineEdit>
 #include <QObject>
 #include <qgraphicsitem.h>
+#include <qline.h>
 #include <qpainterpath.h>
 
 struct BezierElementProperties {
@@ -48,6 +49,7 @@ public:
 
   std::array<QPointF, 4> endpointsToScene(std::array<Point, 4> endpoints);
   QPainterPath createPath(std::array<Point, 4> endpoints);
+  void drawControlLines(std::array<Point, 4> endpoints);
 
   QGraphicsPathItem *graphicsItem() const;
 
@@ -62,6 +64,8 @@ private:
 
   std::array<DraggableEllipseItem *, 4> control_items = {nullptr, nullptr,
                                                          nullptr, nullptr};
+
+  std::array<QGraphicsLineItem *, 2> control_line_items = {nullptr, nullptr};
 
   BezierElementProperties m_properties;
 };
